@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GREEN-API • Test</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 980px; margin: 24px auto; padding: 0 12px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    label { display: block; margin: 10px 0 6px; font-weight: 600; }
+    input, textarea, button { width: 100%; padding: 10px; box-sizing: border-box; }
+    button { cursor: pointer; margin-top: 8px; }
+    textarea { height: 260px; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 12px; margin: 12px 0; }
+    .muted { color: #666; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<h2>GREEN-API • Тестовое задание</h2>
+<p class="muted">Вставь idInstance и apiTokenInstance, нажимай кнопки — ответ API появится внизу.</p>
+
+<div class="card">
+  <div class="row">
+    <div>
+      <label for="idInstance">idInstance</label>
+      <input id="idInstance" placeholder="например: 7105478131" />
+    </div>
+    <div>
+      <label for="apiTokenInstance">apiTokenInstance</label>
+      <input id="apiTokenInstance" placeholder="вставь токен из GREEN-API" />
+    </div>
+  </div>
+
+  <button id="btnSettings">getSettings</button>
+  <button id="btnState">getStateInstance</button>
+</div>
+
+<div class="card">
+  <h3>sendMessage</h3>
+
+  <label for="phone">Номер телефона (пример: 77071234567)</label>
+  <input id="phone" placeholder="7707..." />
+
+  <label for="message">Текст сообщения</label>
+  <input id="message" placeholder="Привет! Это тест." />
+
+  <button id="btnSendMsg">sendMessage</button>
+</div>
+
+<div class="card">
+  <h3>sendFileByUrl</h3>
+
+  <label for="filePhone">Номер телефона (пример: 77071234567)</label>
+  <input id="filePhone" placeholder="7707..." />
+
+  <label for="fileUrl">URL файла (прямая ссылка)</label>
+  <input id="fileUrl" placeholder="https://example.com/photo.jpg" />
+
+  <label for="fileName">Имя файла (как будет в WhatsApp)</label>
+  <input id="fileName" placeholder="photo.jpg" />
+
+  <label for="caption">Подпись (необязательно)</label>
+  <input id="caption" placeholder="Фото для теста" />
+
+  <button id="btnSendFile">sendFileByUrl</button>
+
+  <p class="muted">
+    Подсказка: для sendFileByUrl нужна прямая ссылка на файл (jpg/png/pdf). Google Drive часто не прямая.
+  </p>
+</div>
+
+<div class="card">
+  <label for="response">Ответ API (read-only)</label>
+  <textarea id="response" readonly></textarea>
+</div>
+
+<script>
+  const API_BASE = "https://api.green-api.com";
+  const $ = (id) => document.getElementById(id);
+
+  function setResponse(data) {
+    $("response").value = (typeof data === "string") ? data : JSON.stringify(data, null, 2);
+  }
+
+  function getCreds() {
+    const idInstance = $("idInstance").value.trim();
+    const apiTokenInstance = $("apiTokenInstance").value.trim();
+
+    if (!idInstance || !apiTokenInstance) {
+      throw new Error("Заполни idInstance и apiTokenInstance");
+    }
+    return { idInstance, apiTokenInstance };
+  }
+
+  async function callApi(method, httpMethod = "GET", body = null) {
+    const { idInstance, apiTokenInstance } = getCreds();
+    const url = API_BASE + "/waInstance" + idInstance + "/" + method + "/" + apiTokenInstance;
+
+    const options = { method: httpMethod, headers: { "Content-Type": "application/json" } };
+    if (body) options.body = JSON.stringify(body);
+
+    const res = await fetch(url, options);
+
+    let data;
+    try { data = await res.json(); }
+    catch { data = await res.text(); }
+
+    setResponse(data);
+
+    if (!res.ok) {
+      throw new Error("HTTP " + res.status);
+    }
+    return data;
+  }
+
+  $("btnSettings").addEventListener("click", async () => {
+    try { await callApi("getSettings"); }
+    catch (e) { setResponse(e.message); }
+  });
+
+  $("btnState").addEventListener("click", async () => {
+    try { await callApi("getStateInstance"); }
+    catch (e) { setResponse(e.message); }
+  });
+
+  $("btnSendMsg").addEventListener("click", async () => {
+    try {
+      const phone = $("phone").value.trim();
+      const message = $("message").value.trim();
+      if (!phone || !message) return setResponse("Заполни телефон и сообщение");
+
+      const payload = {
+        chatId: phone + "@c.us",
+        message: message
+      };
+
+      await callApi("sendMessage", "POST", payload);
+    } catch (e) {
+      setResponse(e.message);
+    }
+  });
+
+  $("btnSendFile").addEventListener("click", async () => {
+    try {
+      const phone = $("filePhone").value.trim();
+      const urlFile = $("fileUrl").value.trim();
+      const fileName = ($("fileName").value.trim() || "file");
+      const caption = $("caption").value.trim();
+
+      if (!phone || !urlFile) return setResponse("Заполни телефон и URL файла");
+
+      const payload = {
+        chatId: phone + "@c.us",
+        urlFile: urlFile,
+        fileName: fileName,
+        caption: caption
+      };
+
+      await callApi("sendFileByUrl", "POST", payload);
+    } catch (e) {
+      setResponse(e.message);
+    }
+  });
+</script>
+
+</body>
+</html>
